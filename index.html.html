@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Liga Municipal de Inferiores de Voley 2026</title>
+<style>
+  :root { --cc: #1565C0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f0f2f5; color: #212121; font-size: 14px; }
+  header { background: var(--cc); color: #fff; padding: 12px 16px 10px; text-align: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,.3); transition: background .3s; }
+  header h1 { font-size: 15px; font-weight: 800; line-height: 1.2; }
+  header p { font-size: 10px; opacity: .85; margin-top: 3px; }
+  .cat-tabs { display: flex; background: #fff; border-bottom: 1px solid #e0e0e0; position: sticky; top: 62px; z-index: 99; }
+  .cat-tab { flex: 1; padding: 10px 4px; text-align: center; font-size: 11px; font-weight: 700; color: #999; cursor: pointer; border-bottom: 3px solid transparent; transition: all .2s; white-space: nowrap; }
+  .cat-tab.active { color: var(--cc); border-bottom-color: var(--cc); }
+  .sub-tabs { display: flex; background: #fafafa; border-bottom: 1px solid #e0e0e0; }
+  .sub-tab { flex: 1; padding: 10px; text-align: center; font-size: 12px; font-weight: 600; color: #999; cursor: pointer; border-bottom: 2px solid transparent; transition: all .2s; }
+  .sub-tab.active { color: #333; border-bottom-color: #555; background: #fff; }
+  .content { padding: 12px; }
+  .loader { text-align: center; padding: 40px 20px; color: #999; font-size: 13px; }
+  .spinner { width: 36px; height: 36px; border: 3px solid #e0e0e0; border-top-color: var(--cc); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 14px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error-box { background: #fff3f3; border: 1px solid #ffcdd2; border-radius: 10px; padding: 20px 16px; text-align: center; color: #c62828; font-size: 13px; margin: 4px; line-height: 1.6; }
+  .retry-btn { margin-top: 12px; padding: 8px 22px; border: none; background: var(--cc); color: #fff; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 700; }
+  .card { background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.1); margin-bottom: 14px; }
+  .card-hdr { padding: 10px 14px; font-size: 12px; font-weight: 800; color: #fff; text-transform: uppercase; letter-spacing: .05em; background: var(--cc); display: flex; justify-content: space-between; align-items: center; }
+  .refresh-btn { font-size: 11px; background: rgba(255,255,255,.25); border: none; color: #fff; padding: 4px 10px; border-radius: 20px; cursor: pointer; font-weight: 700; }
+  .fivb-note { font-size: 10px; color: #aaa; padding: 6px 14px 10px; font-style: italic; }
+  .last-update { font-size: 10px; color: #bbb; padding: 0 14px 8px; }
+  table.pos { width: 100%; border-collapse: collapse; }
+  table.pos th { padding: 7px 5px; background: #37474F; color: #fff; font-size: 10px; text-align: center; }
+  table.pos th:nth-child(2) { text-align: left; padding-left: 10px; }
+  table.pos td { padding: 10px 5px; border-bottom: 1px solid #f0f0f0; font-size: 12px; text-align: center; }
+  table.pos td:nth-child(2) { text-align: left; padding-left: 10px; font-weight: 600; font-size: 13px; }
+  table.pos tr:nth-child(even) td { background: #f9f9f9; }
+  table.pos tr:last-child td { border-bottom: none; }
+  .pts { font-size: 16px; font-weight: 800; color: var(--cc); }
+  .fecha-block { margin-bottom: 14px; }
+  .fecha-hdr { background: var(--cc); color: #fff; padding: 8px 12px; border-radius: 10px 10px 0 0; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+  .partido { background: #fff; border-left: 1px solid #e8e8e8; border-right: 1px solid #e8e8e8; border-bottom: 1px solid #f0f0f0; padding: 10px 12px; }
+  .partido:last-child { border-radius: 0 0 10px 10px; border-bottom: 1px solid #e8e8e8; }
+  .partido:nth-child(even) { background: #fafafa; }
+  .partido.played { border-left: 3px solid var(--cc); }
+  .match-row { display: flex; align-items: center; gap: 6px; }
+  .equipo { flex: 1; font-weight: 700; font-size: 13px; line-height: 1.2; }
+  .equipo.right { text-align: right; }
+  .score { display: flex; align-items: center; gap: 3px; flex-shrink: 0; }
+  .box { width: 28px; height: 28px; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; }
+  .box.pending { background: #f5f5f5; color: #ccc; font-size: 11px; }
+  .box.win { background: #E8F5E9; color: #2E7D32; }
+  .box.loss { background: #FFEBEE; color: #C62828; }
+  .sep { font-size: 10px; color: #ccc; }
+  .meta { font-size: 10px; color: #aaa; margin-top: 3px; }
+  .footer-note { text-align: center; padding: 8px; font-size: 10px; color: #bbb; }
+  .footer-note a { color: #bbb; }
+</style>
+</head>
+<body>
+
+<header id="hdr">
+  <h1>🏐 Liga Municipal de Inferiores de Voley 2026</h1>
+  <p>Sistema FIVB &nbsp;·&nbsp; 2-0=3pts &nbsp;|&nbsp; 2-1=2pts &nbsp;|&nbsp; 1-2=1pt &nbsp;|&nbsp; 0-2=0pts</p>
+</header>
+
+<div class="cat-tabs">
+  <div class="cat-tab active" onclick="switchCat('Sub 12 Fem')">Sub 12</div>
+  <div class="cat-tab" onclick="switchCat('Sub 14 Fem')">Sub 14</div>
+  <div class="cat-tab" onclick="switchCat('Sub 16 Fem')">Sub 16</div>
+  <div class="cat-tab" onclick="switchCat('Sub 18 Fem')">Sub 18</div>
+</div>
+
+<div class="sub-tabs">
+  <div class="sub-tab active" onclick="switchSub('pos')">📊 Posiciones</div>
+  <div class="sub-tab" onclick="switchSub('fix')">📅 Fixture</div>
+</div>
+
+<div class="content" id="content">
+  <div class="loader"><div class="spinner"></div>Cargando datos...</div>
+</div>
+
+<script>
+const API = "https://script.google.com/macros/s/AKfycbzuV2lvZJzpt_bkFtyvT7qEZhFqYAqf7DxFWaPasbuGh5O1VM0WVb-nJzBWMfFr-yt6/exec";
+const COLORS = {"Sub 12 Fem":"#1565C0","Sub 14 Fem":"#1B5E20","Sub 16 Fem":"#6A1B9A","Sub 18 Fem":"#B71C1C"};
+const LABELS = {"Sub 12 Fem":"Sub 12 Femenino","Sub 14 Fem":"Sub 14 Femenino","Sub 16 Fem":"Sub 16 Femenino","Sub 18 Fem":"Sub 18 Femenino"};
+
+let curCat = "Sub 12 Fem", curSub = "pos";
+let allData = null, loadedAt = null;
+
+function fetchAll() {
+  return new Promise((resolve, reject) => {
+    const cbName = 'cb_' + Date.now();
+    const script = document.createElement('script');
+    const timer = setTimeout(() => {
+      delete window[cbName];
+      document.body.removeChild(script);
+      reject(new Error('Timeout'));
+    }, 15000);
+    window[cbName] = function(data) {
+      clearTimeout(timer);
+      delete window[cbName];
+      document.body.removeChild(script);
+      resolve(data);
+    };
+    script.src = API + '?callback=' + cbName;
+    script.onerror = () => { clearTimeout(timer); reject(new Error('Error de red')); };
+    document.body.appendChild(script);
+  });
+}
+
+// ── Posiciones ────────────────────────────────────────────────────────────────
+// Row layout: [#(0), Equipo(1), PJ(2), PG(3), PP(4), SF(5), SC(6), Dif(7), Pts(8)]
+function parseStandings(rows) {
+  const out = [];
+  for (const row of rows) {
+    const n = parseInt(row[0]);
+    if (!n || n < 1 || n > 50) continue;
+    const team = String(row[1]||'').trim();
+    if (!team) continue;
+    out.push({
+      team,
+      pj:row[2]||0, pg:row[3]||0, pp:row[4]||0,
+      sf:row[5]||0, sc:row[6]||0, dif:row[7]||0,
+      pts:row[8]||0
+    });
+  }
+  out.sort((a,b) => (parseFloat(b.pts)||0)-(parseFloat(a.pts)||0));
+  return out;
+}
+
+// ── Fixture ───────────────────────────────────────────────────────────────────
+// From the JSON we can see clearly:
+// - Fecha header is in col 0 (A): e.g. ["Fecha 1 — 17/06","","","",...]
+// - Header row: col 9="Hora", col 10="Local", col 11="Sets L", col 12="Sets V", col 13="Visitante", col 14="Sede"
+// - Match row: col 9=hora, col 10=local, col 11=setsL, col 12=setsV, col 13=visit, col 14=sede
+// - Empty row between dates: all empty strings
+
+function parseFixture(rows) {
+  const fechas = [];
+  let cur = null;
+
+  for (const row of rows) {
+    const col0 = String(row[0]||'').trim();
+    const col10 = String(row[10]||'').trim();
+    const col13 = String(row[13]||'').trim();
+
+    // Fecha header: col A starts with "Fecha"
+    if (/^Fecha\s+\d/i.test(col0)) {
+      cur = {fecha: col0, partidos: []};
+      fechas.push(cur);
+      continue;
+    }
+
+    if (!cur) continue;
+
+    // Skip header row (col10 = "Local") and empty rows
+    if (!col10 || col10 === 'Local' || col10 === 'Hora') continue;
+    if (!col13 || col13 === 'Visitante') continue;
+
+    // Values arrive as numbers (2,1,0) or empty string when not played
+    const numL = (row[11] !== '' && row[11] !== null && row[11] !== undefined) ? parseFloat(row[11]) : NaN;
+    const numV = (row[12] !== '' && row[12] !== null && row[12] !== undefined) ? parseFloat(row[12]) : NaN;
+    const hasResult = !isNaN(numL) && !isNaN(numV);
+    // Valid best-of-3: max=2, min<=1
+    const valid = hasResult && Math.max(numL,numV) === 2 && Math.min(numL,numV) <= 1;
+
+    cur.partidos.push({
+      local: col10,
+      visit: col13,
+      sL: valid ? String(numL) : null,
+      sV: valid ? String(numV) : null,
+      hora: String(row[9]||'').trim(),
+      sede: String(row[14]||'').trim(),
+    });
+  }
+
+  return fechas.filter(f => f.partidos.length > 0);
+}
+
+// ── Render posiciones ─────────────────────────────────────────────────────────
+function renderPos(rows) {
+  const st = parseStandings(rows);
+  if (!st.length) return '<div class="error-box">La tabla todavía no tiene datos.</div>';
+  const medals = ['🥇','🥈','🥉'];
+  const ts = loadedAt ? loadedAt.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}) : '';
+  let h = `<div class="card">
+    <div class="card-hdr">${LABELS[curCat]} — Posiciones
+      <button class="refresh-btn" onclick="reload()">↻ Actualizar</button>
+    </div>
+    <table class="pos"><thead><tr>
+      <th>#</th><th>Equipo</th><th>PJ</th><th>PG</th><th>PP</th><th>SF</th><th>SC</th><th>Dif</th><th>Pts</th>
+    </tr></thead><tbody>`;
+  st.forEach((t,i) => {
+    h += `<tr>
+      <td>${i+1}</td>
+      <td>${medals[i]||''} ${t.team}</td>
+      <td>${t.pj}</td><td>${t.pg}</td><td>${t.pp}</td>
+      <td>${t.sf}</td><td>${t.sc}</td><td>${t.dif}</td>
+      <td class="pts">${t.pts}</td>
+    </tr>`;
+  });
+  h += `</tbody></table>
+    <div class="last-update">Actualizado: ${ts}</div>
+    <div class="fivb-note">* Datos en tiempo real desde Google Sheets.</div>
+  </div>`;
+  return h;
+}
+
+// ── Render fixture ────────────────────────────────────────────────────────────
+function renderFix(rows) {
+  const fx = parseFixture(rows);
+  if (!fx.length) return '<div class="error-box">No se encontraron fechas en el fixture.</div>';
+  const ts = loadedAt ? loadedAt.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}) : '';
+  let h = '';
+  fx.forEach(b => {
+    h += `<div class="fecha-block"><div class="fecha-hdr">${b.fecha}</div>`;
+    b.partidos.forEach(p => {
+      const played = p.sL !== null && p.sV !== null;
+      const lw = played && parseFloat(p.sL) > parseFloat(p.sV);
+      const vw = played && parseFloat(p.sV) > parseFloat(p.sL);
+      const bL = played ? `<div class="box ${lw?'win':'loss'}">${p.sL}</div>` : `<div class="box pending">-</div>`;
+      const bV = played ? `<div class="box ${vw?'win':'loss'}">${p.sV}</div>` : `<div class="box pending">-</div>`;
+      const meta = [p.hora, p.sede].filter(Boolean).join(' · ');
+      h += `<div class="partido${played?' played':''}">
+        <div class="match-row">
+          <span class="equipo">${p.local}</span>
+          <div class="score">${bL}<span class="sep">·</span>${bV}</div>
+          <span class="equipo right">${p.visit}</span>
+        </div>
+        ${meta?`<div class="meta">${meta}</div>`:''}
+      </div>`;
+    });
+    h += '</div>';
+  });
+  h += `<div class="footer-note">Actualizado: ${ts} · <a href="#" onclick="reload();return false;">↻ Actualizar</a></div>`;
+  return h;
+}
+
+// ── Control ───────────────────────────────────────────────────────────────────
+function setColor(hex) {
+  document.documentElement.style.setProperty('--cc', hex);
+  document.getElementById('hdr').style.background = hex;
+}
+
+function showLoader() {
+  document.getElementById('content').innerHTML = '<div class="loader"><div class="spinner"></div>Cargando desde Google Sheets...</div>';
+}
+
+function showError(msg) {
+  document.getElementById('content').innerHTML = `<div class="error-box">${msg}<br><button class="retry-btn" onclick="reload()">↻ Reintentar</button></div>`;
+}
+
+function renderCurrent() {
+  if (!allData) return false;
+  const rows = allData[curCat] || [];
+  setColor(COLORS[curCat]);
+  document.getElementById('content').innerHTML = curSub==='pos' ? renderPos(rows) : renderFix(rows);
+  return true;
+}
+
+async function loadAll(force=false) {
+  if (!force && allData && loadedAt && (new Date()-loadedAt)<120000) { renderCurrent(); return; }
+  showLoader();
+  try {
+    allData = await fetchAll();
+    loadedAt = new Date();
+    renderCurrent();
+  } catch(e) {
+    showError('No se pudieron cargar los datos.<br><small>' + e.message + '</small>');
+  }
+}
+
+function switchCat(cat) {
+  curCat = cat;
+  setColor(COLORS[cat]);
+  document.querySelectorAll('.cat-tab').forEach((t,i) => {
+    t.className = 'cat-tab'+(["Sub 12 Fem","Sub 14 Fem","Sub 16 Fem","Sub 18 Fem"][i]===cat?' active':'');
+  });
+  renderCurrent() || loadAll();
+}
+
+function switchSub(sub) {
+  curSub = sub;
+  document.querySelectorAll('.sub-tab').forEach((t,i) => {
+    t.className = 'sub-tab'+((i===0&&sub==='pos')||(i===1&&sub==='fix')?' active':'');
+  });
+  renderCurrent();
+}
+
+function reload() { loadAll(true); }
+
+loadAll();
+</script>
+</body>
+</html>
