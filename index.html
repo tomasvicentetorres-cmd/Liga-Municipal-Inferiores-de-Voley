@@ -279,14 +279,36 @@ function parseFixture(rows) {
     return null;
   }
 
+  // Parsear "DD/MM HH:MM" o "DD/MM" → { dateKey: "MM/DD" para sort, label: "DD/MM", hora: "HH:MM" }
+  function parseColJ(val) {
+    const str = String(val||'').trim();
+    if (!str) return { dateKey: null, dateLabel: null, hora: '' };
+    // Buscar DD/MM con hora opcional
+    const m = str.match(/^(\d{1,2})\/(\d{1,2})(?:\s+(\d{1,2}:\d{2}))?/);
+    if (m) {
+      const dd = m[1].padStart(2,'0');
+      const mm = m[2].padStart(2,'0');
+      const hora = m[3] || '';
+      // dateKey: MMDD para orden cronológico simple
+      const dateKey = mm + dd;
+      return { dateKey, dateLabel: `${dd}/${mm}`, hora };
+    }
+    // Si no matchea fecha, tratar todo como hora
+    return { dateKey: null, dateLabel: null, hora: str };
+  }
+
+  // Mapa de fecha → bloque (para agrupar partidos de distintas "Fecha X" que caen el mismo día)
+  // Usamos array para preservar orden de inserción
+  const dateMap = new Map(); // dateKey → { fecha, partidos, playoff, dateKey }
+
   for (const row of rows) {
-    const col0 = String(row[0]||'').trim();
-    const col10 = String(row[10]||'').trim();
-    const col13 = String(row[13]||'').trim();
+    const col0  = String(row[0]||'').trim();
+    const col10 = String(row[10]||'').trim(); // K = Local
+    const col13 = String(row[13]||'').trim(); // N = Visitante
 
     // Fecha regular: col A empieza con "Fecha"
     if (/^Fecha\s+\d/i.test(col0)) {
-      cur = { fecha: col0, partidos: [], playoff: null };
+      cur = { fecha: col0, partidos: [], playoff: null, dateKey: null };
       fechas.push(cur);
       continue;
     }
@@ -294,7 +316,7 @@ function parseFixture(rows) {
     // Fase de playoff: col A contiene keyword
     const po = detectPlayoff(col0);
     if (po) {
-      cur = { fecha: po.label, partidos: [], playoff: po };
+      cur = { fecha: po.label, partidos: [], playoff: po, dateKey: null };
       fechas.push(cur);
       continue;
     }
@@ -310,18 +332,80 @@ function parseFixture(rows) {
     const hasResult = !isNaN(numL) && !isNaN(numV);
     const valid = hasResult && Math.max(numL,numV) === 2 && Math.min(numL,numV) <= 1;
 
+    // Columna J = Hora (índice 9)
+    const { dateKey, dateLabel, hora } = parseColJ(row[9]);
+
     cur.partidos.push({
-      local: col10,
-      visit: col13,
-      sL: valid ? String(numL) : null,
-      sV: valid ? String(numV) : null,
-      hora: String(row[9]||'').trim(),
-      sede: String(row[14]||'').trim(),
-      playoff: !!cur.playoff,
+      local:    col10,
+      visit:    col13,
+      sL:       valid ? String(numL) : null,
+      sV:       valid ? String(numV) : null,
+      hora,
+      dateLabel,
+      dateKey,
+      sede:     String(row[14]||'').trim(),
+      playoff:  !!cur.playoff,
     });
+
+    // Actualizar dateKey del bloque con la primera fecha encontrada
+    if (dateKey && !cur.dateKey) cur.dateKey = dateKey;
   }
 
-  return fechas.filter(f => f.partidos.length > 0);
+  // Filtrar bloques sin partidos
+  const validFechas = fechas.filter(f => f.partidos.length > 0);
+
+  // Separar playoffs (van al final, en orden original) y fechas regulares
+  const playoffBlocks = validFechas.filter(f => f.playoff);
+  const regularBlocks = validFechas.filter(f => !f.playoff);
+
+  // Agrupar fechas regulares por fecha calendario
+  // Si un bloque tiene dateKey, lo usamos para agrupar y ordenar
+  const grouped = new Map(); // dateKey → { dateLabel, partidos[] }
+  const noDateBlocks = [];
+
+  for (const b of regularBlocks) {
+    if (b.dateKey) {
+      if (!grouped.has(b.dateKey)) {
+        // Buscar dateLabel de los partidos
+        const dl = b.partidos.find(p => p.dateLabel)?.dateLabel || b.dateKey;
+        grouped.set(b.dateKey, { dateKey: b.dateKey, dateLabel: dl, partidos: [], playoff: null });
+      }
+      grouped.get(b.dateKey).partidos.push(...b.partidos);
+    } else {
+      // Sin fecha en col J: mantener bloque original
+      noDateBlocks.push(b);
+    }
+  }
+
+  // Ordenar grupos por fecha (MMDD)
+  const sortedGroups = [...grouped.values()].sort((a,b) => a.dateKey.localeCompare(b.dateKey));
+
+  // Si hay grupos con fecha, usarlos; si no, usar bloques originales
+  let result;
+  if (sortedGroups.length > 0) {
+    // Convertir grupos a formato de bloque con encabezado de fecha
+    const calBlocks = sortedGroups.map(g => {
+      // Nombre del día de la semana
+      const [dd, mm] = g.dateLabel.split('/');
+      let dayName = '';
+      try {
+        const d = new Date(2026, parseInt(mm)-1, parseInt(dd));
+        dayName = d.toLocaleDateString('es-AR', { weekday: 'long' });
+        dayName = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+      } catch(e) {}
+      return {
+        fecha: dayName ? `${dayName} ${g.dateLabel}` : g.dateLabel,
+        partidos: g.partidos,
+        playoff: null,
+        dateKey: g.dateKey,
+      };
+    });
+    result = [...calBlocks, ...noDateBlocks, ...playoffBlocks];
+  } else {
+    result = validFechas;
+  }
+
+  return result;
 }
 
 // ── Render posiciones ─────────────────────────────────────────────────────────
@@ -420,11 +504,9 @@ function renderFix(rows) {
   if (!fx.length) return '<div class="error-box">No se encontraron fechas en el fixture.</div>';
   const ts = loadedAt ? loadedAt.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}) : '';
 
-  // Campeones
   const champs = extractChampions(fx);
   let h = '';
 
-  // Banner campeón (solo si hay campeón)
   h += renderChampionBanner(champs.champion, curCat);
 
   fx.forEach(b => {
@@ -445,7 +527,12 @@ function renderFix(rows) {
       const vw = played && parseFloat(p.sV) > parseFloat(p.sL);
       const bL = played ? `<div class="box ${lw?'win':'loss'}">${p.sL}</div>` : `<div class="box pending">-</div>`;
       const bV = played ? `<div class="box ${vw?'win':'loss'}">${p.sV}</div>` : `<div class="box pending">-</div>`;
-      const meta = [p.hora, p.sede].filter(Boolean).join(' · ');
+
+      // Meta: hora + fecha (si hay) + sede
+      const horaPart = p.hora ? p.hora : '';
+      const sedePart = p.sede ? p.sede : '';
+      const meta = [horaPart, sedePart].filter(Boolean).join(' · ');
+
       const extraClass = p.playoff ? ' playoff' : '';
       h += `<div class="partido${played?' played':''}${extraClass}">
         <div class="match-row">
@@ -460,9 +547,7 @@ function renderFix(rows) {
     h += '</div>';
   });
 
-  // Podio (solo si hay al menos un resultado de playoff)
   h += renderPodium(champs);
-
   h += `<div class="footer-note">Actualizado: ${ts} · <a href="#" onclick="reload();return false;">↻ Actualizar</a><br>Creado por Tomás Vicente Torres</div>`;
   return h;
 }
