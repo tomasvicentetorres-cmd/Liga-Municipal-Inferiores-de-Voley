@@ -233,6 +233,7 @@ function renderPos(rows) {
   h += `</tbody></table>
     <div class="last-update">Actualizado: ${ts}</div>
     <div class="fivb-note">* Datos en tiempo real desde Google Sheets.</div>
+    <div class="fivb-note">Creado por Tomás Vicente Torres</div>
   </div>`;
   return h;
 }
@@ -263,7 +264,7 @@ function renderFix(rows) {
     });
     h += '</div>';
   });
-  h += `<div class="footer-note">Actualizado: ${ts} · <a href="#" onclick="reload();return false;">↻ Actualizar</a><br>Creado por Tomás Torres</div>`;
+  h += `<div class="footer-note">Actualizado: ${ts} · <a href="#" onclick="reload();return false;">↻ Actualizar</a><br>Creado por Tomás Vicente Torres</div>`;
   return h;
 }
 
