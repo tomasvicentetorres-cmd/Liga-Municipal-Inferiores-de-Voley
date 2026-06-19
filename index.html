@@ -54,6 +54,97 @@
   .meta { font-size: 10px; color: #aaa; margin-top: 3px; }
   .footer-note { text-align: center; padding: 8px; font-size: 10px; color: #bbb; }
   .footer-note a { color: #bbb; }
+  /* ── Playoffs ── */
+  .playoff-block { margin-bottom: 14px; }
+  .playoff-hdr {
+    color: #fff;
+    padding: 10px 14px;
+    border-radius: 10px 10px 0 0;
+    font-size: 12px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .playoff-hdr.final    { background: linear-gradient(90deg,#B8860B,#FFD700,#B8860B); color: #222; }
+  .playoff-hdr.semi     { background: linear-gradient(90deg,#555,#888,#555); }
+  .playoff-hdr.tercero  { background: linear-gradient(90deg,#7B4B00,#CD7F32,#7B4B00); }
+  .playoff-hdr.cruce    { background: linear-gradient(90deg,#1a237e,#3949ab,#1a237e); }
+  .playoff-badge {
+    font-size: 16px;
+  }
+  .partido.playoff { border-left: 3px solid #FFD700; background: #fffdf0; }
+  .partido.playoff.played { border-left: 3px solid #DAA520; }
+
+  /* ── Banner Campeón ── */
+  .champion-banner {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    border-radius: 14px;
+    padding: 20px 16px 16px;
+    margin-bottom: 16px;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(0,0,0,.4);
+    position: relative;
+    overflow: hidden;
+  }
+  .champion-banner::before {
+    content: '';
+    position: absolute;
+    top: -30px; left: -30px; right: -30px; bottom: -30px;
+    background: radial-gradient(ellipse at center, rgba(255,215,0,.08) 0%, transparent 70%);
+  }
+  .champion-trophy { font-size: 42px; line-height: 1; margin-bottom: 4px; }
+  .champion-label {
+    font-size: 10px; font-weight: 800; letter-spacing: .15em;
+    color: #FFD700; text-transform: uppercase; opacity: .85;
+  }
+  .champion-name {
+    font-size: 22px; font-weight: 900; color: #fff;
+    margin: 4px 0 2px; line-height: 1.2;
+    text-shadow: 0 2px 8px rgba(255,215,0,.4);
+  }
+  .champion-cat {
+    font-size: 11px; color: rgba(255,255,255,.55); font-weight: 600;
+  }
+  .champion-stars { font-size: 14px; margin-top: 6px; letter-spacing: 4px; }
+
+  /* ── Podio ── */
+  .podium-card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.1);
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .podium-title {
+    background: #37474F;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    padding: 8px 14px;
+  }
+  .podium-row {
+    display: flex;
+    align-items: center;
+    padding: 10px 14px;
+    border-bottom: 1px solid #f0f0f0;
+    gap: 10px;
+  }
+  .podium-row:last-child { border-bottom: none; }
+  .podium-medal { font-size: 22px; flex-shrink: 0; }
+  .podium-pos { font-size: 11px; color: #999; font-weight: 700; flex-shrink: 0; width: 24px; }
+  .podium-team { font-size: 14px; font-weight: 700; flex: 1; }
+  .podium-bar-wrap { width: 60px; flex-shrink: 0; }
+  .podium-bar {
+    height: 6px; border-radius: 3px;
+  }
+  .podium-bar.gold   { background: linear-gradient(90deg,#B8860B,#FFD700); width: 100%; }
+  .podium-bar.silver { background: linear-gradient(90deg,#888,#ccc); width: 75%; }
+  .podium-bar.bronze { background: linear-gradient(90deg,#7B4B00,#CD7F32); width: 50%; }
 </style>
 </head>
 <body>
@@ -170,29 +261,53 @@ function parseFixture(rows) {
   const fechas = [];
   let cur = null;
 
+  // Palabras clave que indican una fase de playoff (en col A)
+  const PLAYOFF_KEYS = [
+    { re: /FINAL\s+FEMENINO/i,         type: 'final',   emoji: '🏆', label: null },
+    { re: /GRAN\s+FINAL/i,             type: 'final',   emoji: '🏆', label: null },
+    { re: /\bFINAL\b/i,                type: 'final',   emoji: '🏆', label: null },
+    { re: /TERCER\s+PUESTO|3.?\s*PUESTO|BRONCE/i, type: 'tercero', emoji: '🥉', label: null },
+    { re: /SEMIFINAL/i,                type: 'semi',    emoji: '⚔️',  label: null },
+    { re: /CUARTO\s*DE\s*FINAL|CUARTOS/i, type: 'cruce', emoji: '🎯', label: null },
+    { re: /CRUCE|PLAYOFF|REPECHAJE|RECLASIFICACI/i, type: 'cruce', emoji: '🎯', label: null },
+  ];
+
+  function detectPlayoff(text) {
+    for (const k of PLAYOFF_KEYS) {
+      if (k.re.test(text)) return { type: k.type, emoji: k.emoji, label: text };
+    }
+    return null;
+  }
+
   for (const row of rows) {
     const col0 = String(row[0]||'').trim();
     const col10 = String(row[10]||'').trim();
     const col13 = String(row[13]||'').trim();
 
-    // Fecha header: col A starts with "Fecha"
+    // Fecha regular: col A empieza con "Fecha"
     if (/^Fecha\s+\d/i.test(col0)) {
-      cur = {fecha: col0, partidos: []};
+      cur = { fecha: col0, partidos: [], playoff: null };
+      fechas.push(cur);
+      continue;
+    }
+
+    // Fase de playoff: col A contiene keyword
+    const po = detectPlayoff(col0);
+    if (po) {
+      cur = { fecha: po.label, partidos: [], playoff: po };
       fechas.push(cur);
       continue;
     }
 
     if (!cur) continue;
 
-    // Skip header row (col10 = "Local") and empty rows
+    // Skip header / empty rows
     if (!col10 || col10 === 'Local' || col10 === 'Hora') continue;
     if (!col13 || col13 === 'Visitante') continue;
 
-    // Values arrive as numbers (2,1,0) or empty string when not played
     const numL = (row[11] !== '' && row[11] !== null && row[11] !== undefined) ? parseFloat(row[11]) : NaN;
     const numV = (row[12] !== '' && row[12] !== null && row[12] !== undefined) ? parseFloat(row[12]) : NaN;
     const hasResult = !isNaN(numL) && !isNaN(numV);
-    // Valid best-of-3: max=2, min<=1
     const valid = hasResult && Math.max(numL,numV) === 2 && Math.min(numL,numV) <= 1;
 
     cur.partidos.push({
@@ -202,6 +317,7 @@ function parseFixture(rows) {
       sV: valid ? String(numV) : null,
       hora: String(row[9]||'').trim(),
       sede: String(row[14]||'').trim(),
+      playoff: !!cur.playoff,
     });
   }
 
@@ -238,14 +354,91 @@ function renderPos(rows) {
   return h;
 }
 
+// ── Extraer campeones del fixture ─────────────────────────────────────────────
+function extractChampions(fx) {
+  const result = { champion: null, second: null, third: null };
+
+  for (const b of fx) {
+    if (!b.playoff) continue;
+    const type = b.playoff.type;
+
+    for (const p of b.partidos) {
+      if (p.sL === null || p.sV === null) continue;
+      const sL = parseFloat(p.sL), sV = parseFloat(p.sV);
+      const winner = sL > sV ? p.local : p.visit;
+      const loser  = sL > sV ? p.visit : p.local;
+
+      if (type === 'final') {
+        result.champion = winner;
+        result.second   = loser;
+      }
+      if (type === 'tercero') {
+        result.third = winner;
+      }
+    }
+  }
+  return result;
+}
+
+// ── Render banner campeón ─────────────────────────────────────────────────────
+function renderChampionBanner(champion, cat) {
+  if (!champion) return '';
+  return `<div class="champion-banner">
+    <div class="champion-trophy">🏆</div>
+    <div class="champion-label">Campeonas ${LABELS[cat]}</div>
+    <div class="champion-name">${champion}</div>
+    <div class="champion-stars">⭐ ⭐ ⭐</div>
+  </div>`;
+}
+
+// ── Render podio ──────────────────────────────────────────────────────────────
+function renderPodium(champs) {
+  const { champion, second, third } = champs;
+  if (!champion && !second && !third) return '';
+  const rows = [
+    { medal:'🥇', pos:'1°', team: champion||'—', bar:'gold'   },
+    { medal:'🥈', pos:'2°', team: second  ||'—', bar:'silver' },
+    { medal:'🥉', pos:'3°', team: third   ||'—', bar:'bronze' },
+  ];
+  let h = `<div class="podium-card">
+    <div class="podium-title">🏅 Posiciones Finales</div>`;
+  rows.forEach(r => {
+    h += `<div class="podium-row">
+      <div class="podium-medal">${r.medal}</div>
+      <div class="podium-pos">${r.pos}</div>
+      <div class="podium-team">${r.team}</div>
+      <div class="podium-bar-wrap"><div class="podium-bar ${r.bar}"></div></div>
+    </div>`;
+  });
+  h += '</div>';
+  return h;
+}
+
 // ── Render fixture ────────────────────────────────────────────────────────────
 function renderFix(rows) {
   const fx = parseFixture(rows);
   if (!fx.length) return '<div class="error-box">No se encontraron fechas en el fixture.</div>';
   const ts = loadedAt ? loadedAt.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}) : '';
+
+  // Campeones
+  const champs = extractChampions(fx);
   let h = '';
+
+  // Banner campeón (solo si hay campeón)
+  h += renderChampionBanner(champs.champion, curCat);
+
   fx.forEach(b => {
-    h += `<div class="fecha-block"><div class="fecha-hdr">${b.fecha}</div>`;
+    if (b.playoff) {
+      const po = b.playoff;
+      h += `<div class="playoff-block">
+        <div class="playoff-hdr ${po.type}">
+          <span class="playoff-badge">${po.emoji}</span>
+          ${b.fecha}
+        </div>`;
+    } else {
+      h += `<div class="fecha-block"><div class="fecha-hdr">${b.fecha}</div>`;
+    }
+
     b.partidos.forEach(p => {
       const played = p.sL !== null && p.sV !== null;
       const lw = played && parseFloat(p.sL) > parseFloat(p.sV);
@@ -253,7 +446,8 @@ function renderFix(rows) {
       const bL = played ? `<div class="box ${lw?'win':'loss'}">${p.sL}</div>` : `<div class="box pending">-</div>`;
       const bV = played ? `<div class="box ${vw?'win':'loss'}">${p.sV}</div>` : `<div class="box pending">-</div>`;
       const meta = [p.hora, p.sede].filter(Boolean).join(' · ');
-      h += `<div class="partido${played?' played':''}">
+      const extraClass = p.playoff ? ' playoff' : '';
+      h += `<div class="partido${played?' played':''}${extraClass}">
         <div class="match-row">
           <span class="equipo">${p.local}</span>
           <div class="score">${bL}<span class="sep">·</span>${bV}</div>
@@ -262,8 +456,13 @@ function renderFix(rows) {
         ${meta?`<div class="meta">${meta}</div>`:''}
       </div>`;
     });
+
     h += '</div>';
   });
+
+  // Podio (solo si hay al menos un resultado de playoff)
+  h += renderPodium(champs);
+
   h += `<div class="footer-note">Actualizado: ${ts} · <a href="#" onclick="reload();return false;">↻ Actualizar</a><br>Creado por Tomás Vicente Torres</div>`;
   return h;
 }
