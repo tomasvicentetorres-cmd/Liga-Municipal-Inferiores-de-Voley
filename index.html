@@ -78,6 +78,9 @@
   .partido.playoff { border-left: 3px solid #FFD700; background: #fffdf0; }
   .partido.playoff.played { border-left: 3px solid #DAA520; }
 
+  /* Partidos con asterisco en la hora: meta (hora · sede) con el color de la categoría */
+  .partido.starred .meta { color: var(--cc); font-weight: 600; }
+
   /* ── Banner Campeón ── */
   .champion-banner {
     background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
@@ -318,6 +321,7 @@ function parseFixture(rows) {
       hora: String(row[9]||'').trim(),
       sede: String(row[14]||'').trim(),
       playoff: !!cur.playoff,
+      starred: String(row[9]||'').includes('*'),
     });
   }
 
@@ -447,7 +451,8 @@ function renderFix(rows) {
       const bV = played ? `<div class="box ${vw?'win':'loss'}">${p.sV}</div>` : `<div class="box pending">-</div>`;
       const meta = [p.hora, p.sede].filter(Boolean).join(' · ');
       const extraClass = p.playoff ? ' playoff' : '';
-      h += `<div class="partido${played?' played':''}${extraClass}">
+      const starClass  = p.starred ? ' starred' : '';
+      h += `<div class="partido${played?' played':''}${extraClass}${starClass}">
         <div class="match-row">
           <span class="equipo">${p.local}</span>
           <div class="score">${bL}<span class="sep">·</span>${bV}</div>
