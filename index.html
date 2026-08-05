@@ -552,7 +552,11 @@ function renderCurrent() {
   const rows = allData[curCat] || [];
   setColor(COLORS[curCat]);
   document.getElementById('content').innerHTML = curSub==='pos' ? renderPos(rows) : renderFix(rows);
-  if (curSub === 'fix') scrollToTargetFecha();
+  if (curSub === 'fix') {
+    scrollToTargetFecha();
+  } else {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }
   return true;
 }
 
