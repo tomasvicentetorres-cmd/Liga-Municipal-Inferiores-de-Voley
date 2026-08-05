@@ -170,8 +170,8 @@
 </div>
 
 <div class="sub-tabs">
-  <div class="sub-tab active" onclick="switchSub('pos')">📊 Posiciones</div>
-  <div class="sub-tab" onclick="switchSub('fix')">📅 Fixture</div>
+  <div class="sub-tab" onclick="switchSub('pos')">📊 Posiciones</div>
+  <div class="sub-tab active" onclick="switchSub('fix')">📅 Fixture</div>
 </div>
 
 <div class="content" id="content">
@@ -183,7 +183,7 @@ const API = "https://script.google.com/macros/s/AKfycbzuV2lvZJzpt_bkFtyvT7qEZhFq
 const COLORS = {"Sub 12 Fem":"#1565C0","Sub 14 Fem":"#1B5E20","Sub 16 Fem":"#6A1B9A","Sub 18 Fem":"#B71C1C"};
 const LABELS = {"Sub 12 Fem":"Sub 12 Femenino","Sub 14 Fem":"Sub 14 Femenino","Sub 16 Fem":"Sub 16 Femenino","Sub 18 Fem":"Sub 18 Femenino"};
 
-let curCat = "Sub 12 Fem", curSub = "pos";
+let curCat = "Sub 12 Fem", curSub = "fix";
 let allData = null, loadedAt = null;
 
 function fetchAll() {
@@ -289,7 +289,18 @@ function parseFixture(rows) {
 
     // Fecha regular: col A empieza con "Fecha"
     if (/^Fecha\s+\d/i.test(col0)) {
-      cur = { fecha: col0, partidos: [], playoff: null };
+      const dm = col0.match(/(\d{1,2})\/(\d{1,2})/g); // puede haber más de una (rango)
+      let fechaStart = null, fechaEnd = null;
+      if (dm && dm.length) {
+        const now = new Date();
+        const dates = dm.map(s => {
+          const [d, m] = s.split('/').map(n => parseInt(n, 10));
+          return new Date(now.getFullYear(), m - 1, d);
+        });
+        fechaStart = new Date(Math.min(...dates.map(d => d.getTime())));
+        fechaEnd = new Date(Math.max(...dates.map(d => d.getTime())));
+      }
+      cur = { fecha: col0, partidos: [], playoff: null, dateStart: fechaStart, dateEnd: fechaEnd };
       fechas.push(cur);
       continue;
     }
@@ -431,16 +442,16 @@ function renderFix(rows) {
   // Banner campeón (solo si hay campeón)
   h += renderChampionBanner(champs.champion, curCat);
 
-  fx.forEach(b => {
+  fx.forEach((b, idx) => {
     if (b.playoff) {
       const po = b.playoff;
-      h += `<div class="playoff-block">
+      h += `<div class="playoff-block" id="fx-block-${idx}">
         <div class="playoff-hdr ${po.type}">
           <span class="playoff-badge">${po.emoji}</span>
           ${b.fecha}
         </div>`;
     } else {
-      h += `<div class="fecha-block"><div class="fecha-hdr">${b.fecha}</div>`;
+      h += `<div class="fecha-block" id="fx-block-${idx}"><div class="fecha-hdr">${b.fecha}</div>`;
     }
 
     b.partidos.forEach(p => {
@@ -469,7 +480,57 @@ function renderFix(rows) {
   h += renderPodium(champs);
 
   h += `<div class="footer-note">Actualizado: ${ts} · <a href="#" onclick="reload();return false;">↻ Actualizar</a><br>Creado por Tomás Vicente Torres</div>`;
+
+  // Guarda el índice de la fecha "actual" para el auto-scroll
+  window.__fxTargetIdx = computeTargetFechaIdx(fx);
+
   return h;
+}
+
+// ── Determina qué fecha mostrar según el día de hoy ────────────────────────────
+function computeTargetFechaIdx(fx) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  let ongoingIdx = -1;
+  let upcomingIdx = -1, bestUpcomingDiff = Infinity;
+  let lastPastIdx = -1, bestPastDiff = -Infinity;
+
+  fx.forEach((b, idx) => {
+    if (!b.dateStart || !b.dateEnd) return; // fases de playoff sin fecha fija: se ignoran
+
+    const start = new Date(b.dateStart); start.setHours(0, 0, 0, 0);
+    const end = new Date(b.dateEnd); end.setHours(0, 0, 0, 0);
+
+    if (today >= start && today <= end) {
+      if (ongoingIdx === -1) ongoingIdx = idx; // hoy cae dentro del rango de esta fecha
+    } else if (start > today) {
+      const diff = start - today;
+      if (diff < bestUpcomingDiff) { bestUpcomingDiff = diff; upcomingIdx = idx; }
+    } else if (end < today) {
+      const diff = end - today; // negativo; el más cercano a 0 es el más reciente
+      if (diff > bestPastDiff) { bestPastDiff = diff; lastPastIdx = idx; }
+    }
+  });
+
+  if (ongoingIdx !== -1) return ongoingIdx;
+  if (upcomingIdx !== -1) return upcomingIdx;
+  if (lastPastIdx !== -1) return lastPastIdx;
+  return fx.length ? 0 : -1;
+}
+
+// ── Auto-scroll a la fecha vigente (cada vez que se renderiza el fixture) ──────
+function scrollToTargetFecha() {
+  const idx = window.__fxTargetIdx;
+  if (idx === undefined || idx < 0) return;
+  const el = document.getElementById('fx-block-' + idx);
+  if (!el) return;
+  setTimeout(() => {
+    const headerOffset = 110; // altura aprox. del header + tabs sticky
+    const rect = el.getBoundingClientRect();
+    const scrollTop = window.pageYOffset + rect.top - headerOffset;
+    window.scrollTo({ top: Math.max(scrollTop, 0), behavior: 'smooth' });
+  }, 60);
 }
 
 // ── Control ───────────────────────────────────────────────────────────────────
@@ -491,6 +552,7 @@ function renderCurrent() {
   const rows = allData[curCat] || [];
   setColor(COLORS[curCat]);
   document.getElementById('content').innerHTML = curSub==='pos' ? renderPos(rows) : renderFix(rows);
+  if (curSub === 'fix') scrollToTargetFecha();
   return true;
 }
 
