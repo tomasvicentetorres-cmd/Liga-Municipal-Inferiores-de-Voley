@@ -179,88 +179,35 @@
 </div>
 
 <script>
-// ── Fuente de datos: CSV publicado del Google Sheet (sin Apps Script) ──────────
-// Reemplaza el esquema anterior (JSONP vía Apps Script), que dependía de la
-// capacidad de ejecuciones concurrentes de Apps Script y se saturaba con
-// muchos usuarios simultáneos. Este método lee directo de la infraestructura
-// de Google Sheets (sin pasar por Apps Script), soportando lectura concurrente
-// sin ese límite.
-const SHEET_ID = "1qYTmJhjr6BCjByXyNyKb69Iiwyce1rhpjQl22OQzAtQ";
-const SHEET_NAMES = ["Sub 12 Fem", "Sub 14 Fem", "Sub 16 Fem", "Sub 18 Fem"];
+const API = "https://script.google.com/macros/s/AKfycbzuV2lvZJzpt_bkFtyvT7qEZhFqYAqf7DxFWaPasbuGh5O1VM0WVb-nJzBWMfFr-yt6/exec";
 const COLORS = {"Sub 12 Fem":"#1565C0","Sub 14 Fem":"#1B5E20","Sub 16 Fem":"#6A1B9A","Sub 18 Fem":"#B71C1C"};
 const LABELS = {"Sub 12 Fem":"Sub 12 Femenino","Sub 14 Fem":"Sub 14 Femenino","Sub 16 Fem":"Sub 16 Femenino","Sub 18 Fem":"Sub 18 Femenino"};
 
 let curCat = "Sub 12 Fem", curSub = "fix";
 let allData = null, loadedAt = null;
 
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-function csvUrl(sheetName) {
-  return 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/gviz/tq?tqx=out:csv&sheet=' + encodeURIComponent(sheetName) + '&t=' + Date.now();
-}
-
-// Parser CSV robusto: soporta campos entre comillas, comas y comillas dobles
-// escapadas dentro del campo (ej. equipos con "A"/"B" en el nombre).
-function parseCSV(text) {
-  const rows = [];
-  let row = [], field = '', inQuotes = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (inQuotes) {
-      if (c === '"') {
-        if (text[i + 1] === '"') { field += '"'; i++; }
-        else { inQuotes = false; }
-      } else {
-        field += c;
-      }
-    } else if (c === '"') {
-      inQuotes = true;
-    } else if (c === ',') {
-      row.push(field); field = '';
-    } else if (c === '\r') {
-      // se ignora, el salto real lo maneja \n
-    } else if (c === '\n') {
-      row.push(field); field = '';
-      rows.push(row); row = [];
-    } else {
-      field += c;
-    }
-  }
-  if (field !== '' || row.length) { row.push(field); rows.push(row); }
-  return rows;
-}
-
-async function fetchSheetCSV(sheetName, attempt = 1) {
-  const maxAttempts = 4;
-  const delays = [800, 1800, 3500];
-  try {
-    const res = await fetch(csvUrl(sheetName), { cache: 'no-store' });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const text = await res.text();
-    if (!text || !text.trim()) throw new Error('Respuesta vacía');
-    return parseCSV(text);
-  } catch (e) {
-    if (attempt < maxAttempts) {
-      await sleep(delays[attempt - 1]);
-      return fetchSheetCSV(sheetName, attempt + 1);
-    }
-    throw new Error('No se pudo cargar "' + sheetName + '": ' + e.message);
-  }
-}
-
-async function fetchAll() {
-  const results = {};
-  let completed = 0;
-  const total = SHEET_NAMES.length;
-  await Promise.all(SHEET_NAMES.map(async (name) => {
-    results[name] = await fetchSheetCSV(name);
-    completed++;
-    const loaderEl = document.querySelector('.loader');
-    if (loaderEl) loaderEl.innerHTML = '<div class="spinner"></div>Cargando datos... (' + completed + '/' + total + ')';
-  }));
-  return results;
+function fetchAll() {
+  return new Promise((resolve, reject) => {
+    const cbName = 'voley_' + Date.now();
+    const script = document.createElement('script');
+    const timer = setTimeout(() => {
+      try { delete window[cbName]; document.body.removeChild(script); } catch(e) {}
+      reject(new Error('Timeout'));
+    }, 20000);
+    window[cbName] = function(data) {
+      clearTimeout(timer);
+      try { delete window[cbName]; document.body.removeChild(script); } catch(e) {}
+      resolve(data);
+    };
+    script.src = API + '?callback=' + cbName + '&t=' + Date.now();
+    script.async = true;
+    script.onerror = function() {
+      clearTimeout(timer);
+      try { delete window[cbName]; document.body.removeChild(script); } catch(e) {}
+      reject(new Error('Error de red'));
+    };
+    document.head.appendChild(script);
+  });
 }
 
 // ── Posiciones ────────────────────────────────────────────────────────────────
