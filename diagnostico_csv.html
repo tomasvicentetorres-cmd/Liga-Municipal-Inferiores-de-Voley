@@ -74,19 +74,29 @@ async function testSheet(name, div) {
       return;
     }
     const rows = parseCSV(text);
-    const fechaRows = rows.filter(r => /^Fecha\s+\d/i.test(String(r[0]||'').trim()));
+    const fechaHits = [];
+    rows.forEach((r, ri) => {
+      r.forEach((cell, ci) => {
+        if (/^Fecha\s+\d/i.test(String(cell||'').trim())) {
+          fechaHits.push({ row: ri, col: ci, text: cell });
+        }
+      });
+    });
+    const fechaRowsCol0 = rows.filter(r => /^Fecha\s+\d/i.test(String(r[0]||'').trim()));
     const withLocalVisit = rows.filter(r => String(r[10]||'').trim() && String(r[13]||'').trim() && r[10] !== 'Local');
     let colCounts = {};
     rows.forEach(r => { colCounts[r.length] = (colCounts[r.length]||0)+1; });
-    const status = fechaRows.length > 0 ? 'ok' : 'fail';
+    const status = fechaRowsCol0.length > 0 ? 'ok' : (fechaHits.length > 0 ? 'pending' : 'fail');
     div.className = 'test ' + status;
     div.querySelector('.status').innerHTML = `
-      ${fechaRows.length > 0 ? '✅' : '⚠️'} ${rows.length} filas totales, ${text.length} caracteres<br>
-      Filas "Fecha N" detectadas: <b>${fechaRows.length}</b><br>
+      ${status === 'ok' ? '✅' : '⚠️'} ${rows.length} filas totales, ${text.length} caracteres<br>
+      "Fecha N" en columna 0: <b>${fechaRowsCol0.length}</b><br>
+      "Fecha N" en CUALQUIER columna: <b>${fechaHits.length}</b><br>
+      ${fechaHits.length ? 'Columnas donde aparece: <b>' + [...new Set(fechaHits.map(h=>h.col))].join(', ') + '</b><br>' : ''}
       Filas con Local+Visitante (col 10/13): <b>${withLocalVisit.length}</b><br>
       Distribución de largo de fila: <code>${JSON.stringify(colCounts)}</code><br>
-      Primeras 2 filas "Fecha": <pre>${fechaRows.slice(0,2).map(r=>JSON.stringify(r[0])).join('\n')}</pre>
-      Primer fila con datos crudos: <pre>${JSON.stringify(rows[16]||rows[4]||[])}</pre>
+      Primeros 5 hits de "Fecha": <pre>${fechaHits.slice(0,5).map(h=>'fila '+h.row+', col '+h.col+': '+JSON.stringify(h.text)).join('\n')}</pre>
+      Fila completa donde aparece el primer hit: <pre>${fechaHits.length ? JSON.stringify(rows[fechaHits[0].row]) : '(ninguno)'}</pre>
     `;
   } catch (e) {
     div.className = 'test fail';
