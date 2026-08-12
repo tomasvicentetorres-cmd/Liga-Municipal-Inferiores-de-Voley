@@ -97,6 +97,10 @@ async function testSheet(name, div) {
       Distribución de largo de fila: <code>${JSON.stringify(colCounts)}</code><br>
       Primeros 5 hits de "Fecha": <pre>${fechaHits.slice(0,5).map(h=>'fila '+h.row+', col '+h.col+': '+JSON.stringify(h.text)).join('\n')}</pre>
       Fila completa donde aparece el primer hit: <pre>${fechaHits.length ? JSON.stringify(rows[fechaHits[0].row]) : '(ninguno)'}</pre>
+      <button onclick="this.nextElementSibling.style.display='block';this.style.display='none';">Ver primeras 30 filas parseadas (con índice)</button>
+      <pre style="display:none;max-height:400px;">${rows.slice(0,30).map((r,i)=>i+': '+JSON.stringify(r)).join('\n').replace(/</g,'&lt;')}</pre>
+      <button onclick="this.nextElementSibling.style.display='block';this.style.display='none';">Ver CSV crudo completo</button>
+      <pre style="display:none;max-height:400px;">${text.replace(/</g,'&lt;')}</pre>
     `;
   } catch (e) {
     div.className = 'test fail';
